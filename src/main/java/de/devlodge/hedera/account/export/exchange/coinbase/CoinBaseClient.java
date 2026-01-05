@@ -1,5 +1,7 @@
 package de.devlodge.hedera.account.export.exchange.coinbase;
 
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 import de.devlodge.hedera.account.export.exchange.ExchangeClient;
 import de.devlodge.hedera.account.export.exchange.ExchangePair;
 import de.devlodge.hedera.account.export.storage.StorageService;
@@ -47,29 +49,42 @@ public class CoinBaseClient implements ExchangeClient {
 
     @Override
     public BigDecimal getCurrentExchangeRate(ExchangePair pair) throws Exception {
-        return getExchangeRate(pair,
-                LocalDate.now(ZoneId.systemDefault()).atStartOfDay(ZoneId.systemDefault()).toInstant());
+        return getExchangeRate(pair,LocalDate.now(ZoneId.systemDefault()));
     }
 
-    public BigDecimal getExchangeRate(final ExchangePair pair, final Instant date) {
+    public BigDecimal getExchangeRate(final ExchangePair pair, final LocalDate date) {
         Objects.requireNonNull(pair, "pair must not be null");
         Objects.requireNonNull(date, "date must not be null");
 
         return storageService.getExchangeRate(pair, date).orElseGet(() -> {
             log.info("Requesting exchange rate for {} on date {}", pair, date);
-            LocalDate dateToUse = ZonedDateTime.ofInstant(date, ZoneId.of(TIMEZONE_DE)).toLocalDate();
             final Exchange exchange = exchanges.stream()
-                    .filter(e -> e.date().equals(dateToUse) && e.pair().equals(pair))
+                    .filter(e -> e.date().equals(date) && e.pair().equals(pair))
                     .findFirst()
                     .orElseGet(() -> {
                         try {
                             final String url = String.format(PRICES_URL, pair, DATE_FORMATTER.format(date));
-                            final BigDecimal rate = HttpUtils.getJsonElementForGetRequest(client, url)
-                                    .getAsJsonObject()
-                                    .getAsJsonObject("data")
-                                    .getAsJsonPrimitive("amount")
-                                    .getAsBigDecimal();
-                            final Exchange e = new Exchange(dateToUse, pair, rate);
+                            final JsonElement result = HttpUtils.getJsonElementForGetRequest(client, url);
+                            final BigDecimal rate;
+                            try {
+                                if(!result.isJsonObject()) {
+                                    throw new IllegalStateException("Invalid JSON response (not an object): " + result);
+                                }
+                                JsonObject resultObject = result.getAsJsonObject();
+                                if(!resultObject.has("data") || !resultObject.get("data").isJsonObject()) {
+                                    throw new IllegalStateException("Invalid JSON response (not an 'data' object): " + result);
+                                }
+                                JsonObject data  = resultObject.getAsJsonObject("data");
+                                if(!data.has("amount") || !data.get("amount").isJsonPrimitive()) {
+                                    throw new IllegalStateException("Invalid JSON response (not an 'amount' value): " + result);
+                                }
+                                rate = data
+                                        .getAsJsonPrimitive("amount")
+                                        .getAsBigDecimal();
+                            } catch (Exception e) {
+                                throw new RuntimeException("Error in extracting rate from JSON: " + result, e);
+                            }
+                            final Exchange e = new Exchange(date, pair, rate);
                             exchanges.add(e);
                             return e;
                         } catch (Exception e) {

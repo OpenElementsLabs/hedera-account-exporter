@@ -2,6 +2,8 @@ package de.devlodge.hedera.account.export.utils;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
+import com.google.gson.JsonSyntaxException;
+
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -45,7 +47,12 @@ public class HttpUtils {
 
     public static JsonElement getJsonElementForGetRequest(final HttpClient client, final URI uri)
             throws IOException, InterruptedException {
-        return JsonParser.parseString(getJsonForGetRequest(client, uri));
+        final String jsonString = getJsonForGetRequest(client, uri);
+        try {
+            return JsonParser.parseString(jsonString);
+        } catch (JsonSyntaxException e) {
+            throw new IllegalStateException("Could not parse json string: " + jsonString, e);
+        }
     }
 
     public static JsonElement getJsonElementForGetRequest(final HttpClient client, final String uri)

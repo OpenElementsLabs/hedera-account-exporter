@@ -1,22 +1,28 @@
 package de.devlodge.hedera.account.export.storage;
 
 import de.devlodge.hedera.account.export.exchange.ExchangePair;
+import de.devlodge.hedera.account.export.model.Currency;
 import de.devlodge.hedera.account.export.model.Transaction;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.math.BigDecimal;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.security.MessageDigest;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.ZoneId;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Properties;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.TemporalAccessor;
+import java.util.*;
+
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVParser;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -40,6 +46,28 @@ public class StorageServiceImpl implements StorageService {
         this.path = Path.of(noteFile);
         this.internalStore = new Properties();
         load();
+        loadManualExchanges();
+    }
+
+    private void loadManualExchanges() {
+        final CSVFormat format = CSVFormat.Builder.create(CSVFormat.DEFAULT)
+                .setHeader("date", "hbar-in-eur")
+                .setSkipHeaderRecord(true)
+                .build();
+        final DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd.MM.yyyy");
+        try(InputStream resource = StorageServiceImpl.class.getClassLoader().getResourceAsStream("manual_exchange.csv")) {
+            final CSVParser parser = CSVParser.parse(resource, Charset.defaultCharset(), format);
+            final ExchangePair exchangePair = new ExchangePair(Currency.HBAR, Currency.EUR);
+            parser.stream()
+                    .forEach(line -> {
+                        final TemporalAccessor temporalAccessor = formatter.parse(line.get(0));
+                        final LocalDate localDate = LocalDate.from(temporalAccessor);
+                        final BigDecimal rate = new BigDecimal(line.get(1));
+                        addExchangeRate(exchangePair, localDate, rate);
+                    });
+        } catch (IOException e) {
+            throw new IllegalStateException("Can not read manual exchanges file", e);
+        }
     }
 
     public void addNote(final Transaction transaction, final String note) {
@@ -55,7 +83,7 @@ public class StorageServiceImpl implements StorageService {
     }
 
     @Override
-    public void addExchangeRate(ExchangePair pair, Instant date, BigDecimal rate) {
+    public void addExchangeRate(ExchangePair pair, LocalDate date, BigDecimal rate) {
         Objects.requireNonNull(pair, "pair must not be null");
         Objects.requireNonNull(date, "date must not be null");
         Objects.requireNonNull(rate, "rate must not be null");
@@ -66,7 +94,7 @@ public class StorageServiceImpl implements StorageService {
     }
 
     @Override
-    public Optional<BigDecimal> getExchangeRate(ExchangePair pair, Instant date) {
+    public Optional<BigDecimal> getExchangeRate(ExchangePair pair, LocalDate date) {
         Objects.requireNonNull(pair, "pair must not be null");
         Objects.requireNonNull(date, "date must not be null");
         final String hash = hash(pair, date);
@@ -81,12 +109,11 @@ public class StorageServiceImpl implements StorageService {
         return hash(data);
     }
 
-    private String hash(final ExchangePair pair, final Instant date) {
+    private String hash(final ExchangePair pair, final LocalDate date) {
         Objects.requireNonNull(pair, "pair must not be null");
         Objects.requireNonNull(date, "date must not be null");
-
         final String data =
-                pair.from() + "-" + pair.to() + "-" + date.atZone(ZONE_ID).toEpochSecond();
+                pair.from() + "-" + pair.to() + "-" + date.toEpochDay();
         return hash(data);
     }
 

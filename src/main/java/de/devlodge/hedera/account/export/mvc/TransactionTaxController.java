@@ -8,6 +8,8 @@ import de.devlodge.hedera.account.export.session.SessionStore;
 import de.devlodge.hedera.account.export.storage.StorageService;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
@@ -193,7 +195,7 @@ public class TransactionTaxController {
     private BigDecimal getExchangeRate(final Transaction transaction) {
         try {
             return exchangeClient.getExchangeRate(new ExchangePair(Currency.HBAR, Currency.EUR),
-                    transaction.timestamp());
+                    LocalDate.ofInstant(transaction.timestamp(), ZoneId.systemDefault()));
         } catch (Exception e) {
             throw new RuntimeException("Can not get exchange rate", e);
         }

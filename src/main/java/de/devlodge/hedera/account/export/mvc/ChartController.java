@@ -8,6 +8,7 @@ import de.devlodge.hedera.account.export.model.Transaction;
 import de.devlodge.hedera.account.export.session.SessionStore;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
@@ -130,7 +131,7 @@ public class ChartController {
     private BigDecimal getExchangeRate(final Instant timestamp) {
         try {
             return exchangeClient.getExchangeRate(new ExchangePair(Currency.HBAR, Currency.EUR),
-                    timestamp);
+                    LocalDate.ofInstant(timestamp, ZoneId.systemDefault()));
         } catch (Exception e) {
             throw new RuntimeException("Can not get exchange rate", e);
         }
