@@ -195,7 +195,7 @@ public class TransactionTaxController {
     private BigDecimal getExchangeRate(final Transaction transaction) {
         try {
             return exchangeClient.getExchangeRate(new ExchangePair(Currency.HBAR, Currency.EUR),
-                    LocalDate.ofInstant(transaction.timestamp(), ZoneId.systemDefault()));
+                    transaction.timestamp());
         } catch (Exception e) {
             throw new RuntimeException("Can not get exchange rate", e);
         }

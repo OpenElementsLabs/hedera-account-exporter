@@ -14,9 +14,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.security.MessageDigest;
-import java.time.Instant;
-import java.time.LocalDate;
-import java.time.ZoneId;
+import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.TemporalAccessor;
 import java.util.*;
@@ -33,6 +31,7 @@ import org.springframework.web.context.annotation.ApplicationScope;
 public class StorageServiceImpl implements StorageService {
 
     private final static Logger log = LoggerFactory.getLogger(StorageServiceImpl.class);
+    public static final ZoneId ZONE = ZoneId.of("Europe/Berlin");
 
     private final Path path;
 
@@ -61,9 +60,10 @@ public class StorageServiceImpl implements StorageService {
             parser.stream()
                     .forEach(line -> {
                         final TemporalAccessor temporalAccessor = formatter.parse(line.get(0));
-                        final LocalDate localDate = LocalDate.from(temporalAccessor);
                         final BigDecimal rate = new BigDecimal(line.get(1));
-                        addExchangeRate(exchangePair, localDate, rate);
+                        final ZonedDateTime date = LocalDate.parse(line.get(0), formatter)
+                                .atStartOfDay(ZoneId.of("Europe/Berlin"));
+                        addExchangeRate(exchangePair, date, rate);
                     });
         } catch (IOException e) {
             throw new IllegalStateException("Can not read manual exchanges file", e);
@@ -83,7 +83,7 @@ public class StorageServiceImpl implements StorageService {
     }
 
     @Override
-    public void addExchangeRate(ExchangePair pair, LocalDate date, BigDecimal rate) {
+    public void addExchangeRate(ExchangePair pair, ZonedDateTime date, BigDecimal rate) {
         Objects.requireNonNull(pair, "pair must not be null");
         Objects.requireNonNull(date, "date must not be null");
         Objects.requireNonNull(rate, "rate must not be null");
@@ -94,7 +94,7 @@ public class StorageServiceImpl implements StorageService {
     }
 
     @Override
-    public Optional<BigDecimal> getExchangeRate(ExchangePair pair, LocalDate date) {
+    public Optional<BigDecimal> getExchangeRate(ExchangePair pair, ZonedDateTime date) {
         Objects.requireNonNull(pair, "pair must not be null");
         Objects.requireNonNull(date, "date must not be null");
         final String hash = hash(pair, date);
@@ -109,11 +109,13 @@ public class StorageServiceImpl implements StorageService {
         return hash(data);
     }
 
-    private String hash(final ExchangePair pair, final LocalDate date) {
+    private String hash(final ExchangePair pair, final ZonedDateTime date) {
         Objects.requireNonNull(pair, "pair must not be null");
         Objects.requireNonNull(date, "date must not be null");
+        ZonedDateTime normalizedDate = date.withZoneSameInstant(ZONE);
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd.MM.yyyy");
         final String data =
-                pair.from() + "-" + pair.to() + "-" + date.toEpochDay();
+                pair.from() + "-" + pair.to() + "-" + formatter.format(normalizedDate);
         return hash(data);
     }
 

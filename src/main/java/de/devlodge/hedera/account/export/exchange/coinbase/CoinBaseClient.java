@@ -8,10 +8,7 @@ import de.devlodge.hedera.account.export.storage.StorageService;
 import de.devlodge.hedera.account.export.utils.HttpUtils;
 import java.math.BigDecimal;
 import java.net.http.HttpClient;
-import java.time.Instant;
-import java.time.LocalDate;
-import java.time.ZoneId;
-import java.time.ZonedDateTime;
+import java.time.*;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Objects;
@@ -49,14 +46,15 @@ public class CoinBaseClient implements ExchangeClient {
 
     @Override
     public BigDecimal getCurrentExchangeRate(ExchangePair pair) throws Exception {
-        return getExchangeRate(pair,LocalDate.now(ZoneId.systemDefault()));
+        return getExchangeRate(pair,Instant.now());
     }
 
-    public BigDecimal getExchangeRate(final ExchangePair pair, final LocalDate date) {
+    public BigDecimal getExchangeRate(final ExchangePair pair, final Instant date) {
         Objects.requireNonNull(pair, "pair must not be null");
         Objects.requireNonNull(date, "date must not be null");
+        final ZonedDateTime dateTime = date.atZone(ZoneOffset.UTC);
 
-        return storageService.getExchangeRate(pair, date).orElseGet(() -> {
+        return storageService.getExchangeRate(pair, dateTime).orElseGet(() -> {
             log.info("Requesting exchange rate for {} on date {}", pair, date);
             final Exchange exchange = exchanges.stream()
                     .filter(e -> e.date().equals(date) && e.pair().equals(pair))
@@ -91,12 +89,12 @@ public class CoinBaseClient implements ExchangeClient {
                             throw new RuntimeException("Error in fetching exchange", e);
                         }
                     });
-            storageService.addExchangeRate(pair, date, exchange.rate());
+            storageService.addExchangeRate(pair, dateTime, exchange.rate());
             return exchange.rate();
         });
     }
 
-    private record Exchange(LocalDate date, ExchangePair pair, BigDecimal rate) {
+    private record Exchange(Instant date, ExchangePair pair, BigDecimal rate) {
     }
 
 }

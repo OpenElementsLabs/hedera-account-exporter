@@ -3,7 +3,9 @@ package de.devlodge.hedera.account.export.storage;
 import de.devlodge.hedera.account.export.exchange.ExchangePair;
 import de.devlodge.hedera.account.export.model.Transaction;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZonedDateTime;
 import java.util.Optional;
 
 public interface StorageService {
@@ -12,7 +14,7 @@ public interface StorageService {
 
     Optional<String> getNote(final Transaction transaction);
 
-    void addExchangeRate(final ExchangePair pair, final LocalDate date, BigDecimal rate);
+    void addExchangeRate(final ExchangePair pair, final ZonedDateTime date, BigDecimal rate);
 
-    Optional<BigDecimal> getExchangeRate(final ExchangePair pair, final LocalDate date);
+    Optional<BigDecimal> getExchangeRate(final ExchangePair pair, final ZonedDateTime date);
 }
